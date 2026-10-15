@@ -1,0 +1,6 @@
+Third-party scripts in this folder, both MIT licensed:
+
+exifr.lite.umd.js   exifr 7.1.3 (lite build), Copyright (c) 2020 Mike Kovařík, Mutiny.cz — https://github.com/MikeKovarik/exifr
+                    Reads capture dates from visitors' photos (JPEG, HEIC, PNG).
+heic2any.min.js     heic2any 0.0.4, Copyright (c) Alex Corvi — https://github.com/alexcorvi/heic2any
+                    Converts HEIC in browsers that cannot decode it (Chrome, Firefox). Loaded only when needed.

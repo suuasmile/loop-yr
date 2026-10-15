@@ -1,0 +1,317 @@
+/* Loopyear — styles
+   Sizes come from the Figma "Screen Design" canvas, 4570 px wide: px / 4570 → vw.
+   Black stage with a WebGL ring of photo cards. Header: lockup left, Month / Day / time right,
+   view controls under it. Rolling year column at left, info button at right. */
+
+@font-face {
+  font-family: "Urbanist";
+  src: url("../fonts/Urbanist.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #000000;
+  --fg: #ffffff;
+  --fg-50: rgba(255, 255, 255, 0.5);
+  --fg-10: rgba(255, 255, 255, 0.1);
+  --font: "Urbanist", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --t-hero: clamp(44px, 3.24vw, 148px);    /* 148 / 4570 */
+  --t-sub: clamp(16px, 1.4vw, 64px);       /* 64 */
+  --t-hint: clamp(13px, 1.05vw, 48px);     /* 48 */
+  --t-title: clamp(24px, 1.97vw, 90px);    /* lockup, 109px box */
+  --t-value: clamp(16px, 1.4vw, 64px);     /* 64: field values, current year */
+  --t-label: clamp(11px, 0.7vw, 32px);     /* 32: Month, Day, PM, other years */
+  --pad-x: 3.4vw;                          /* 154 / 4570 */
+  --pad-top: 2.7vw;                        /* 124 / 4570 */
+  --ease: cubic-bezier(.22, .8, .24, 1);
+  --glide: cubic-bezier(.65, 0, .35, 1);   /* ease-in-out for the line extending and the title lifting */
+  --rise: 1000ms;                          /* copy and buttons rising into place */
+  --rise-stagger: 70ms;                    /* gap between one line or button and the next */
+  --ui-delay: 350ms;                       /* header and year column start rising this long after the ring enters */
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-weight: 400;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  touch-action: none;           /* the page handles swipes and pinches itself; no browser zoom */
+}
+[hidden] { display: none !important; }          /* hidden wins over any display set below */
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible, select:focus-visible { outline: 1px solid var(--fg); outline-offset: 3px; }
+
+/* ---------- WebGL stage ---------- */
+#stage { position: fixed; inset: 0; cursor: grab; user-select: none; -webkit-user-select: none; }
+#stage.dragging { cursor: grabbing; }
+#stage.over-card { cursor: pointer; }
+#gl { display: block; width: 100%; height: 100%; }
+
+/* ---------- UI overlay ---------- */
+#ui { position: fixed; inset: 0; pointer-events: none; }
+#ui > * { pointer-events: auto; }
+#header {
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: calc(var(--pad-top) + env(safe-area-inset-top, 0px)) var(--pad-x) 0;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem;
+  pointer-events: none;
+}
+#header > * { pointer-events: auto; }
+#brand {
+  font-size: var(--t-title); line-height: 1.2; letter-spacing: -0.01em;
+}
+/* Footer: date and time, then the view buttons, centred at the bottom (same composition as the phone) */
+#right {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column; align-items: center; gap: calc(var(--t-value) * 0.6);
+  padding: calc(var(--pad-top) * 1.4) var(--pad-x) calc(var(--pad-top) * 0.8 + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 55%, rgba(0, 0, 0, 0));   /* keeps the readout legible over the ring */
+}
+#controls {
+  display: flex; gap: calc(var(--t-value) * 1.56); justify-content: center;
+  font-size: var(--t-label); line-height: 1.2; color: var(--fg-50);
+}
+#controls button { padding: 0.3em 0; border-bottom: 1px solid transparent; white-space: nowrap; }
+#controls button:hover { color: var(--fg); }
+#controls button[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+
+#date {
+  display: flex; align-items: center; justify-content: center; gap: calc(var(--t-value) * 1.56);     /* 100 */
+  font-variant-numeric: tabular-nums;
+}
+.field { display: flex; align-items: center; gap: calc(var(--t-value) * 0.33); }   /* 21 */
+.field label, .ampm { font-size: var(--t-label); color: var(--fg-50); line-height: 1.2; }
+.box {
+  position: relative;
+  background: var(--fg-10);
+  font-size: var(--t-value); line-height: 1.2;
+  height: 1.7em;                                  /* 109 / 64 */
+  display: flex; align-items: center; justify-content: center; gap: 0.5em;
+  padding: 0 1.19em;                              /* 76 / 64 */
+}
+.box.select { padding-right: 1em; }
+.box select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }
+.chev { width: 0.75em; height: 0.75em; position: relative; flex: none; pointer-events: none; }
+.chev::before {
+  content: ""; position: absolute; left: 50%; top: 40%;
+  width: 0.24em; height: 0.24em;
+  border-right: 1px solid var(--fg); border-bottom: 1px solid var(--fg);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.time { position: relative; display: flex; align-items: center; gap: calc(var(--t-value) * 0.33); }
+/* A day with several photos: the time field lists them (chevron shows), and picking one brings it to the front */
+#tsel { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; }
+#tsel:disabled { display: none; }
+.time .chev { display: none; }
+#timeField.multi .time .chev { display: block; }
+#timeField.multi .time .box:last-of-type { padding-right: 1em; }
+.colon { font-size: var(--t-label); }
+
+/* Rolling year column: next year above, current year large, previous year below */
+#years {
+  position: absolute; left: 8.73vw; top: 47.3%;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 3.06vw;   /* 140 */
+  list-style: none; margin: 0; padding: 0;
+  font-variant-numeric: tabular-nums; line-height: 1.2; text-align: center;
+}
+#years button { font-size: var(--t-label); color: var(--fg-50); min-width: 3em; min-height: 1.2em; }
+#years button.now { font-size: var(--t-value); color: var(--fg); cursor: default; }
+#years button:not(.now):hover { color: var(--fg); }
+#years.up li { animation: yearUp 450ms var(--ease); }
+#years.down li { animation: yearDown 450ms var(--ease); }
+@keyframes yearUp { from { transform: translateY(40%); opacity: 0.2; } }
+@keyframes yearDown { from { transform: translateY(-40%); opacity: 0.2; } }
+
+/* Info button: replays the instructions; top right, level with the lockup */
+#infoWrap {
+  position: absolute; right: var(--pad-x);
+  top: calc(var(--pad-top) + env(safe-area-inset-top, 0px) + var(--t-title) * 0.6); transform: translateY(-50%);
+}
+#info {
+  width: clamp(16px, 0.8vw, 37px); height: clamp(16px, 0.8vw, 37px); border-radius: 50%;
+  border: 1px solid var(--fg); color: var(--fg); opacity: 0.85;
+  font-size: clamp(10px, 0.5vw, 22px); line-height: 1; display: grid; place-items: center;
+}
+#info:hover { opacity: 1; }
+
+/* ---------- Instructions: shown the moment you scroll on the opening, gone 5 s later ---------- */
+#intro {
+  position: fixed; inset: 0; z-index: 11; background: var(--bg);
+  display: grid; place-items: center; padding: 0 16px;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 900ms var(--ease), visibility 0s linear 900ms;       /* fading out */
+}
+#intro.show {
+  opacity: 1; visibility: visible; pointer-events: auto;
+  transition: none;                       /* appears at once, covering the opening, so nothing shows between the two */
+}
+#intro.over { background: rgba(0, 0, 0, 0.78); }        /* replayed from the info button, over the ring */
+#intro p {
+  margin: 0; max-width: 30em; text-align: center; text-wrap: balance;
+  font-size: var(--t-sub); line-height: 1.45; color: var(--fg);
+}
+
+/* ---------- 01 Opening (landing) ----------
+   The Figma "01 Opening" frames, played as one sequence. The hyphen of "loop-yr" becomes the line:
+     1  "loop" rises in, centred
+     2  the hyphen grows out of it: "loop-", centred
+     3  "yr" rises in: "loop-yr", centred
+     4  the hyphen stretches across the whole width, pushing "loop" and "yr" off the edges;
+        the subtitle rises in below the line, then "Scroll down to start"
+   Every distance is in the title size (--u, 193 px on the 4570 canvas) and measured from the screen centre.
+   The moves share one 5.2 s timeline (keyframe percentages below: 38.5% = 2000 ms,
+   53.8% = 2800 ms, 55.8% = 2900 ms, 71.2% = 3700 ms, 75% = 3900 ms, 98% = 5100 ms). CSS only, so it plays
+   even before the script has loaded. */
+#landing {
+  --u: clamp(52px, 4.22vw, 193px);                 /* 193 / 4570 */
+  --stroke: calc(0.0732 * var(--u));               /* hyphen and line: 14 px on the canvas */
+  --t-open: 5200ms;                              /* the shared timeline */
+  --t-sub-in: 5000ms;
+  --t-hint-in: 5500ms;
+  position: fixed; inset: 0; z-index: 10; overflow: hidden;
+  background: var(--bg);
+  transition: opacity 500ms var(--ease);
+}
+#landing.gone { opacity: 0; pointer-events: none; }
+#landing .dash {
+  position: absolute; top: calc(50% - var(--stroke) / 2); height: var(--stroke); background: var(--fg);
+  left: 50%; width: 0; animation: dashRun var(--t-open) linear both;
+}
+@keyframes dashRun {                               /* grows out of "loop", follows it, then becomes the full-width line */
+  0%, 38.5%   { width: 0;                     transform: translateX(calc(0.9865 * var(--u))); animation-timing-function: cubic-bezier(.65, 0, .35, 1); }
+  53.8%, 55.8% { width: calc(0.401 * var(--u)); transform: translateX(calc(0.7565 * var(--u))); animation-timing-function: cubic-bezier(.65, 0, .35, 1); }
+  71.2%, 75%  { width: calc(0.401 * var(--u)); transform: translateX(calc(0.331 * var(--u)));  animation-timing-function: cubic-bezier(.65, 0, .35, 1); }
+  98%, 100%   { width: 100vw;                 transform: translateX(-50vw); }
+}
+#landing h1 { position: absolute; inset: 0; margin: 0; font-size: var(--u); font-weight: 400; pointer-events: none; }
+#landing h1 span {
+  position: absolute; left: 50%; top: calc(50% - 0.677 * var(--u));     /* text box 242 px tall, hyphen 123 px below its top */
+  line-height: 1.254; letter-spacing: -0.01em; white-space: nowrap;
+}
+#landing .loop { animation: rise var(--rise) var(--ease) 150ms both, loopRun var(--t-open) linear both; }
+@keyframes loopRun {
+  0%, 38.5%   { transform: translateX(calc(-0.9275 * var(--u))); animation-timing-function: cubic-bezier(.65, 0, .35, 1); }
+  53.8%, 55.8% { transform: translateX(calc(-1.1575 * var(--u))); animation-timing-function: cubic-bezier(.65, 0, .35, 1); }
+  71.2%, 75%  { transform: translateX(calc(-1.583 * var(--u)));  animation-timing-function: cubic-bezier(.65, 0, .35, 1); }
+  98%, 100%   { transform: translateX(calc(-1.914 * var(--u) - 50vw)); }   /* pushed off by the hyphen's left end */
+}
+#landing .yr { animation: rise var(--rise) var(--ease) 2900ms both, yrRun var(--t-open) linear both; }
+@keyframes yrRun {
+  0%, 75%   { transform: translateX(calc(0.733 * var(--u))); animation-timing-function: cubic-bezier(.65, 0, .35, 1); }
+  98%, 100% { transform: translateX(calc(0.001 * var(--u) + 50vw)); }     /* pushed off by the hyphen's right end */
+}
+
+#landing .sub {
+  position: absolute; left: 50%; top: calc(50% + 0.36 * var(--u)); margin: 0;   /* 1353 / 2571, below the line */
+  white-space: nowrap;                             /* two lines, broken as in the design */
+  font-size: calc(0.3316 * var(--u)); line-height: 1.2; text-align: center;      /* 64 px on the canvas */
+  transform: translateX(-50%);
+}
+#landing .sub .ln { display: block; animation: rise var(--rise) var(--ease) var(--t-sub-in) both; }
+#landing .sub .ln + .ln { animation-delay: calc(var(--t-sub-in) + var(--rise-stagger) * 2); }
+
+#start {
+  position: absolute; left: 50%; top: 78%;        /* 2007 / 2571 */
+  transform: translateX(-50%);
+  font-size: var(--t-hint); line-height: 1.2; white-space: nowrap;
+  display: flex; align-items: center; gap: 0.35em;
+  animation: rise var(--rise) var(--ease) var(--t-hint-in) both;
+}
+#start .arrow { width: 0.62em; height: 0.95em; animation: nudge 1.8s ease-in-out infinite; }
+@keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(0.22em); } }
+/* ---------- Rise: copy and buttons come up from behind an invisible edge, one after another ----------
+   The element slides up by its own height while a clip at its resting box hides whatever is still below it,
+   as if it rose out of a slot. Uses `translate` and `clip-path`, so it stacks on any `transform` already there. */
+@keyframes rise {
+  from { translate: 0 105%; clip-path: inset(0 -1em 105% -1em); }
+  to   { translate: 0 0;    clip-path: inset(-1em); }
+}
+#ui:not(.in) .rise { visibility: hidden; }           /* the header and year column wait for the ring */
+#ui.in .rise { animation: rise var(--rise) var(--ease) calc(var(--ui-delay) + var(--i, 0) * var(--rise-stagger)) both; }
+#intro.show .ln { display: block; animation: rise var(--rise) var(--ease) calc(var(--i, 0) * var(--rise-stagger) * 1.3) both; }
+
+#status {
+  position: absolute; left: 50%; bottom: calc(5% + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  margin: 0; width: min(90vw, 36em); text-align: center;
+  font-size: var(--t-label); line-height: 1.4; color: var(--fg-50);
+}
+#status:empty { display: none; }
+
+/* ---------- Add your photos (after the opening) ----------
+   Sits under the opening with its line in the same place, so the opening fades straight into it. Copy above the
+   line, actions below; while photos are read, the line fills from the left as the progress bar. */
+#choose {
+  --u: clamp(52px, 4.22vw, 193px);
+  --stroke: calc(0.0732 * var(--u));
+  position: fixed; inset: 0; z-index: 9; background: var(--bg);
+  visibility: hidden; opacity: 0;
+  transition: opacity 600ms var(--ease), visibility 0s linear 600ms;
+}
+#choose.show { visibility: visible; opacity: 1; transition: none; }
+#choose.show .r { animation: rise var(--rise) var(--ease) calc(350ms + var(--i, 0) * var(--rise-stagger) * 1.5) both; }
+#choose > * { position: absolute; left: 50%; margin: 0; white-space: nowrap; }
+#choose > .r, #choose > .ch-status { transform: translateX(-50%); }
+#chTitle {
+  bottom: calc(50% + 0.42 * var(--u));
+  font-size: calc(0.5 * var(--u)); font-weight: 400; line-height: 1.2; letter-spacing: -0.01em;
+}
+#choose .ch-line {
+  left: 0; right: 0; top: calc(50% - var(--stroke) / 2); height: var(--stroke);
+  background: rgba(255, 255, 255, 0.22);           /* the unfilled part, seen only while reading */
+  transition: height 300ms var(--ease), top 300ms var(--ease);
+}
+.ch-fill { position: absolute; inset: 0; background: var(--fg); transform-origin: left; transform: scaleX(1); transition: transform 300ms var(--ease); }
+#choose.reading .ch-fill { transform: scaleX(var(--p, 0)); }
+#choose.drag .ch-line { height: calc(var(--stroke) * 2.5); top: calc(50% - var(--stroke) * 1.25); }
+.ch-actions { top: calc(50% + 0.5 * var(--u)); display: flex; gap: calc(0.18 * var(--u)); }
+.ch-btn {
+  font-size: calc(0.3316 * var(--u)); line-height: 1; height: 1.9em; padding: 0 1.2em;
+  background: var(--fg-10); color: var(--fg);
+  outline: 1px solid transparent; outline-offset: 3px; transition: outline-color 200ms var(--ease);
+}
+.ch-btn:hover { outline-color: var(--fg); }        /* hover: a white frame around the button, the same as the keyboard focus ring */
+.ch-or { top: calc(50% + 1.35 * var(--u)); font-size: var(--t-label); color: var(--fg-50); }
+.ch-status {
+  top: calc(50% + 1.8 * var(--u)); font-size: var(--t-label); color: var(--fg); font-variant-numeric: tabular-nums;
+}
+#choose.reading .ch-status { top: calc(50% + 0.5 * var(--u)); font-size: calc(0.3316 * var(--u)); }
+#choose.reading .ch-actions, #choose.reading .ch-or, #choose.reading .ch-example { visibility: hidden; }
+.ch-example {
+  top: 78%; font-size: var(--t-hint); line-height: 1.2;
+  display: flex; align-items: center; gap: 0.4em;
+}
+.ch-example .arrow { width: 0.95em; height: 0.62em; transition: transform 300ms var(--ease); }
+.ch-example:hover .arrow { transform: translateX(0.25em); }
+.ch-note { bottom: calc(5% + env(safe-area-inset-bottom, 0px)); font-size: var(--t-label); color: var(--fg-50); }
+@media (hover: none) and (pointer: coarse) {        /* phones and tablets: the picker opens the photo library; no folders or dragging */
+  #chooseFolder, .ch-or { display: none; }
+}
+
+/* ---------- Small screens: lockup + info on top, year column left, date readout at the bottom ---------- */
+@media (max-width: 760px) {
+  :root { --pad-x: 16px; --pad-top: 16px; }
+  #right { gap: 12px; padding: 24px 16px calc(14px + env(safe-area-inset-bottom, 0px)); }
+  #date { gap: 14px; }
+  #controls { gap: 22px; }
+  .field label { display: none; }
+  .box { padding: 0 0.8em; }
+  .box.select { padding-right: 0.6em; }
+  #years { left: 16px; transform: translateY(-50%); align-items: flex-start; gap: 22px; top: 42%; }
+  #years button { min-width: 0; text-align: left; }
+}
+
+/* Reduced motion: the opening shows its final frame at once */
+@media (prefers-reduced-motion: reduce) {
+  #landing h1 { display: none; }                  /* the opening shows its last frame at once */
+  #landing .dash { animation: none; width: 100vw; left: 0; }
+  #start, #start .arrow, #years li, .rise, .ln, #choose .r { animation: none !important; }
+}
