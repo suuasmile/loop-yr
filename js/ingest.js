@@ -1,6 +1,7 @@
 /* loop-yr — reads a visitor's own photos, entirely in the browser (nothing is uploaded or stored)
    YL_INGEST.read(files, onProgress) → Promise of an album the ring can show, shaped like js/data.js:
      { manifest: { years, atlas, sheet, items }, atlas(i), sheet(i), clip(key), skipped }
+     (an item whose date was only estimated carries e: 1, so the ring leaves it out of the day counts)
    - capture dates: EXIF (exifr) for photos, the QuickTime header for videos, then the file name, then the file's
      modified date;
    - a Live Photo (IMG_n.HEIC + IMG_n.MOV) becomes one photo with its motion as the clip;
@@ -155,6 +156,7 @@
         it.medium = await toBlob(med);
         it.rec = { d: stamp(it.date), w: mw, h: mh, a: [ai, cx, cy, tw, th], m: [i >> 2, (i & 1) * MED, ((i >> 1) & 1) * MED, mw, mh] };
         if (it.clip) it.rec.v = "clip:" + i;
+        if (it.estimated) it.rec.e = 1;                                      // date only guessed: left out of the day counts
       } catch (e) { it.failed = true; }
       progress("photos", ++n, items.length);
     });
