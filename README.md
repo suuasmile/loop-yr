@@ -74,17 +74,6 @@ Plain HTML, CSS and JavaScript with no build step. The ring is drawn with three.
 - `js/ingest.js` reads each photo's capture date (EXIF), pairs Live Photos with their motion, and packs thumbnails into texture atlases in the browser. Photos whose date was only estimated are marked so they are not counted.
 - `js/main.js` contains the opening, the ring, and all motion and input. The volume is drawn in two passes. First, every photo and spike is drawn as a soft sprite, added into a half-resolution field. Then a full-screen pass turns that field into the merged body (the threshold sets the surface, and the strength inside picks the colour). The ring's lines and the Stacks tiles are two instanced draws per texture atlas, sharing the same photo data; with Stacks off, each tile sits folded into its line and is not drawn. Without the tiles, a click is matched to the ring by where the pointer meets the ring's plane. The inner ring's heat colours are drawn by the same shader as the month ticks.
 
-### Testing with a local album
-
-`tools/make-test-album.py` writes a list of local files. On `localhost`, `?album=<list>` fetches them from the same local server and reads them exactly as the picker would:
-
-```bash
-python3 loop-yr-public/tools/make-test-album.py yearloop-build > yearloop-build/test-album.json
-python3 -m http.server 8123
-```
-
-Then open `http://localhost:8123/loop-yr-public/?album=/yearloop-build/test-album.json`. This only works on localhost, and nothing leaves the machine.
-
 ## Credits
 
 - [three.js](https://threejs.org) r128 (MIT)

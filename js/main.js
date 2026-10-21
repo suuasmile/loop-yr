@@ -228,32 +228,6 @@
     readOwn(await window.YL_INGEST.filesFromDrop(e.dataTransfer));
   });
 
-  // Local testing only: on localhost, ?album=<list.json> ({ files: [{ url, name }] }, made by tools/make-test-album.py)
-  // fetches those files from the same local server and reads them exactly as the picker would, so a test album opens
-  // without choosing files by hand. Nothing is sent anywhere.
-  const albumList = new URLSearchParams(location.search).get("album");
-  if (albumList && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) (async () => {
-    start();
-    try {
-      const list = (await (await fetch(albumList)).json()).files, files = new Array(list.length);
-      const get = async (url, tries) => {                // a stalled request is retried once, then skipped
-        const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 20000);
-        try { return await (await fetch(url, { signal: ctl.signal })).blob(); }
-        catch (e) { return tries > 1 ? get(url, tries - 1) : null; }
-        finally { clearTimeout(timer); }
-      };
-      let next = 0, n = 0;
-      await Promise.all(Array.from({ length: 8 }, async () => {
-        while (next < list.length) {
-          const k = next++, blob = await get(list[k].url, 2);
-          if (blob) files[k] = new File([blob], list[k].name, { type: blob.type });
-          setProgress(0, `Fetching the test album · ${++n} of ${list.length}`);
-        }
-      }));
-      readOwn(files.filter(Boolean));
-    } catch (e) { console.error(e); chStatus.textContent = "The test album could not be fetched."; }
-  })();
-
   // Scroll, swipe, key or click on the opening starts. Trackpad momentum after that first scroll keeps
   // arriving for a second or two, so scrolling never skips the instructions; a click, tap or Esc does.
   addEventListener("wheel", (e) => {
