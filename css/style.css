@@ -301,7 +301,7 @@ body.heat #years::before { opacity: 1; }
 .ch-actions { top: calc(50% + 0.5 * var(--u)); display: flex; gap: calc(0.18 * var(--u)); }
 .ch-btn {
   font-size: calc(0.3316 * var(--u)); line-height: 1; height: 1.9em; padding: 0 1.2em;
-  background: var(--fg-10); color: var(--fg);
+  background: var(--fg-10); color: var(--fg); border-radius: 999px;   /* rounded, like the date pills */
   outline: 1px solid transparent; outline-offset: 3px; transition: outline-color 200ms var(--ease);
 }
 .ch-btn:hover { outline-color: var(--fg); }        /* hover: a white frame around the button, the same as the keyboard focus ring */
